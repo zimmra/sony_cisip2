@@ -4,7 +4,7 @@
 import logging
 from homeassistant.components.media_player import MediaPlayerEntity
 from homeassistant.components.media_player.const import (
-    MEDIA_TYPE_MUSIC,
+    SUPPORT_SELECT_SOUND_MODE,
     SUPPORT_SELECT_SOURCE,
     SUPPORT_TURN_OFF,
     SUPPORT_TURN_ON,
@@ -25,6 +25,7 @@ ZONES = ["main", "zone2", "zone3"]
 SUPPORTED_FEATURES = (
     SUPPORT_TURN_ON
     | SUPPORT_TURN_OFF
+    | SUPPORT_SELECT_SOUND_MODE
     | SUPPORT_SELECT_SOURCE
     | SUPPORT_VOLUME_MUTE
     | SUPPORT_VOLUME_SET
@@ -70,6 +71,15 @@ MODEL_MAP = {
     'Z31': 'STR-ZA3100ES'
 }
 
+SOUND_MODE_MAP = {
+    '2ch Stereo': '2ch',
+    'Analog Direct': 'direct',
+    'Auto Format Decode': 'afd',
+    'Multi-Channel Stereo': 'multi',
+    'Dolby Surround': 'dolby',
+    'DTS Neural:X': 'neuralx'
+}
+
 class SonyCISIP2MediaPlayer(MediaPlayerEntity):
     def __init__(self, hass: HomeAssistant, controller, mac_address, zone, sony_hwversion, sony_swversion):
         """Initialize the SonyCISIP2MediaPlayer."""
@@ -81,6 +91,7 @@ class SonyCISIP2MediaPlayer(MediaPlayerEntity):
         self._state = None
         self._zone = zone  # Add a zone attribute
         self._source = None
+        self._sound_mode = None
         self._mute = None
         self._volume = None
         self._volumedisplay_mode = 'step'  # Default to 'step' until updated
@@ -152,6 +163,7 @@ class SonyCISIP2MediaPlayer(MediaPlayerEntity):
                 self._state = 'on'
                 self._source = await self._controller.get_feature(f"{feature_prefix}input")
                 self._volumestep = await self._controller.get_feature(f"{feature_prefix}volumestep")
+                self._sound_mode = await self._controller.get_feature("audio.soundfield")
                 mute_state = await self._controller.get_feature(f"{feature_prefix}mute")
 
                 # Update rest of the states based on retrieved values.
@@ -249,6 +261,36 @@ class SonyCISIP2MediaPlayer(MediaPlayerEntity):
         if self._zone in ["zone2", "zone3"]:
             return ["MAIN SOURCE"] + sorted(set(SOURCE_MAPPINGS.values()))
         return sorted(set(SOURCE_MAPPINGS.values()))
+    
+    @property
+    def sound_mode(self):
+        """Return the current sound mode."""
+        if self._sound_mode is None:
+            return None
+        for readable, command in SOUND_MODE_MAP.items():
+            if command == self._sound_mode:
+                return readable
+        return self._sound_mode  # If not found in the mapping, return the raw source
+
+    @property
+    def sound_mode_list(self):
+        """Return the list of available sound modes."""
+        return sorted(set(SOUND_MODE_MAP.keys()))
+
+    async def async_select_sound_mode(self, sound_mode):
+        """Set the sound mode of the media player."""
+        command_value = SOUND_MODE_MAP.get(sound_mode)
+        if command_value is None:
+            # Handle the error: the sound_mode is not recognized
+            _LOGGER.error("Unsupported sound mode: %s", sound_mode)
+            return
+
+        # Use the command to set the sound mode
+        try:
+            await self._controller.set_feature('audio.soundfield', command_value)
+        except Exception as e:
+            _LOGGER.error("Error setting sound mode: %s", e)
+            # Handle any exceptions, possibly re-throwing them or logging them as needed
 
     @property
     def source(self):
@@ -272,7 +314,7 @@ class SonyCISIP2MediaPlayer(MediaPlayerEntity):
         command_value = None
 
         if source == "MAIN SOURCE" and self._zone in ["zone2", "zone3"]:
-            command_value = await self._controller.get_feature(f"main.input")
+            command_value = await self._controller.get_feature("main.input")
             _LOGGER.debug(f"Source 'MAIN SOURCE' selected, setting '{feature_prefix}input' to follow the main zone.")
         else:
             for readable, command in REVERSE_SOURCE_MAPPINGS.items():

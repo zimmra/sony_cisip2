@@ -64,16 +64,20 @@ REVERSE_SOURCE_MAPPINGS = {
     'TUNER': 'tuner',
 }
 
-class SonyCISIP2MediaPlayer(MediaPlayerEntity):
-    def __init__(self, hass: HomeAssistant, controller, mac_address, zone):
-        """Initialize the SonyCISIP2MediaPlayer."""
-        # Initialize receiver count if not already set
-        # if 'receiver_count' not in hass.data[DOMAIN]:
-        #     hass.data[DOMAIN]['receiver_count'] = 0
+MODEL_MAP = {
+    'Z11': 'STR-ZA1100ES',
+    'Z21': 'STR-ZA2100ES',
+    'Z31': 'STR-ZA3100ES'
+}
 
+class SonyCISIP2MediaPlayer(MediaPlayerEntity):
+    def __init__(self, hass: HomeAssistant, controller, mac_address, zone, sony_hwversion, sony_swversion):
+        """Initialize the SonyCISIP2MediaPlayer."""
         self._hass = hass
         self._controller = controller
         self._mac_address = mac_address
+        self._sony_hwversion = sony_hwversion
+        self._sony_swversion = sony_swversion
         self._state = None
         self._zone = zone  # Add a zone attribute
         self._source = None
@@ -88,8 +92,6 @@ class SonyCISIP2MediaPlayer(MediaPlayerEntity):
     @property
     def name(self):
         """Return the name of the media player with a unique identifier."""
-        # Do not increment receiver count here as it should only be done upon creation
-        # receiver_number = self._hass.data[DOMAIN].get('receiver_count', 0)
         mac_for_name = self._mac_address.replace(":", "").lower() if self._mac_address else None
         unique_name = f"Sony Receiver {mac_for_name}-{self._zone}"
         return unique_name
@@ -100,25 +102,31 @@ class SonyCISIP2MediaPlayer(MediaPlayerEntity):
         return 'mdi:audio-video'
     
     @property
+    def device_class(self):
+        """Return the device class of the media player."""
+        return 'receiver'
+    
+    @property
     def device_info(self):
         """Return device information about this Sony CISIP2 receiver."""
         # Use the consistent naming convention for the device name
         mac_for_id = self._mac_address.replace(":", "").lower() if self._mac_address else None
+        sony_hwversion = self._sony_hwversion if self._sony_hwversion else None
+        sony_swversion = self._sony_swversion if self._sony_swversion else "Unknown"
+        sony_hwversion = MODEL_MAP.get(sony_hwversion, 'STR-ZAxx00ES')
         unique_name = f"Sony Receiver {mac_for_id}"
         return {
             "identifiers": {(DOMAIN, mac_for_id)} if mac_for_id else {(DOMAIN, self._controller.host)},
             "name": unique_name,
             "manufacturer": "Sony",
-            "model": "STR-ZAxx00ES",
-            "sw_version": "1.0",
-            "via_device": (DOMAIN, self._hass.data[DOMAIN]["device"].id),
+            "model": sony_hwversion,
+            "sw_version": sony_swversion,
+            # "via_device": (DOMAIN, self._hass.data[DOMAIN]["device"].id),
         }
 
     @property
     def unique_id(self):
         """Return a unique ID for the media player."""
-        # Use the consistent naming convention for the unique ID
-        # receiver_number = self._hass.data[DOMAIN].get('receiver_count', 0)
         mac_for_id = self._mac_address.replace(":", "").lower() if self._mac_address else None
         unique_id = f"sony_cisip2_{mac_for_id}_{self._zone}"
         return unique_id
@@ -293,10 +301,6 @@ class SonyCISIP2MediaPlayer(MediaPlayerEntity):
 
 async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
     """Set up the Sony CISIP2 media player platform."""
-    # Increment receiver count only when a new platform is set up
-    # if DOMAIN not in hass.data:
-    #     hass.data[DOMAIN] = {'receiver_count': 0}
-    # hass.data[DOMAIN]['receiver_count'] += 1
 
     if discovery_info is None:
         return  # Discovery info is missing, so we can't proceed
@@ -305,26 +309,26 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
 
     controller = hass.data[DOMAIN]['controller']
     mac_address = hass.data[DOMAIN]['mac_address']  # Use the MAC address from hass.data
+    sony_hwversion = hass.data[DOMAIN]['sony_hwversion']
+    sony_swversion = hass.data[DOMAIN]['sony_swversion']
     entities = []
     for zone in ZONES:
-        player = SonyCISIP2MediaPlayer(hass, controller, mac_address, zone)
+        player = SonyCISIP2MediaPlayer(hass, controller, mac_address, zone, sony_hwversion, sony_swversion)
         entities.append(player)
 
     async_add_entities(entities)
 
 async def async_setup_entry(hass, entry, async_add_entities):
     """Set up Sony CISIP2 media player based on a config entry."""
-    # Ensure receiver count is only incremented once per entry setup
-    # if 'receiver_count' not in hass.data[DOMAIN]:
-    #     hass.data[DOMAIN]['receiver_count'] = 0
-    # hass.data[DOMAIN]['receiver_count'] += 1
     
     zone = entry.data.get('zone', 'main') 
 
     controller = hass.data[DOMAIN]['controller']
     mac_address = hass.data[DOMAIN]['mac_address']  # Use the MAC address from hass.data
+    sony_hwversion = hass.data[DOMAIN]['sony_hwversion']
+    sony_swversion = hass.data[DOMAIN]['sony_swversion']
     entities = []
     for zone in ZONES:
-        player = SonyCISIP2MediaPlayer(hass, controller, mac_address, zone)
+        player = SonyCISIP2MediaPlayer(hass, controller, mac_address, zone, sony_hwversion, sony_swversion)
         entities.append(player)
     async_add_entities(entities)

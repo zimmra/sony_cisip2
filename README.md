@@ -2,7 +2,7 @@
 
 This custom component integrates Sony ES AV Receivers (STR-ZAxx00ES series) with Home Assistant, allowing for control and automation within your smart home ecosystem. Currently tested and confirmed working with STR-ZA2100ES.
 
-Uses the Python library python_sonycisip2 for communication, found at [zimmra/python_sonycisip](https://github.com/zimmra/python_sonycisip2) and on PyPi.
+Uses the Python library python_sonycisip2 for communication, found at [zimmra/python_sonycisip2](https://github.com/zimmra/python_sonycisip2) and on PyPi.
 
 ## Features
 

@@ -53,7 +53,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         return False  # Unable to retrieve MAC address, do not proceed with setup
     sony_hwversion = await controller.get_feature("system.modeltype")
     sony_swversion = await controller.get_feature("system.version")
-    sony_hwversion = modelmap.get(sony_hwversion, 'STR-ZAxx00ES')
+    sony_hwversion = MODEL_MAP.get(sony_hwversion, 'STR-ZAxx00ES')
 
     # Store the MAC address and the controller instance for use by the platform
     hass.data[DOMAIN]['controller'] = controller

@@ -247,6 +247,9 @@ class SonyCISIP2MediaPlayer(MediaPlayerEntity):
         """Return the current input source from the mapping or raw if not mapped."""
         if self._source is None:
             return None  # If source is None, return None without trying to map it
+        # Check for 'source' and return 'MAIN SOURCE' if it matches
+        if self._source == "source":
+            return "MAIN SOURCE"
 
         # Use the cleaned-up mapping to convert the source command to a human-readable source name
         # Handling multiple receiver source keys mapping to a single Home Assistant source value
@@ -261,7 +264,7 @@ class SonyCISIP2MediaPlayer(MediaPlayerEntity):
         command_value = None
 
         if source == "MAIN SOURCE" and self._zone in ["zone2", "zone3"]:
-            command_value = "source"
+            command_value = await self._controller.get_feature(f"main.input")
             _LOGGER.debug(f"Source 'MAIN SOURCE' selected, setting '{feature_prefix}input' to follow the main zone.")
         else:
             for readable, command in REVERSE_SOURCE_MAPPINGS.items():

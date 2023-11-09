@@ -95,7 +95,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     unique_name = f"Sony Receiver {mac_for_id}" if mac_for_id else f"Sony Receiver MISSINGMAC"
     sony_hwversion = await controller.get_feature("system.modeltype")
     sony_swversion = await controller.get_feature("system.version")
-    sony_hwversion = modelmap.get(sony_hwversion, 'STR-ZAxx00ES')
+    sony_hwversion = MODEL_MAP.get(sony_hwversion, 'STR-ZAxx00ES')
     # Create a device in Home Assistant for this Sony CISIP2 platform using the MAC address
     device = device_registry.async_get_or_create(
         config_entry_id=entry.entry_id,

@@ -19,10 +19,11 @@ You can install this custom component via HACS or manually.
 ### Via HACS
 
 1. Open HACS in Home Assistant.
-2. Navigate to 'Integrations' and then the '+ Explore & Add Repositories' button.
-3. Search for `Sony CISIP2` and select it.
-4. Click 'Install' and select the latest version.
-5. Restart Home Assistant.
+2. Click the menu button in the top right, and then `Custom Repository`
+3. Add this github repos URL as the `Repository` with the category `Integration`
+4. Search for `Sony CISIP2` and select it.
+5. Click 'Install' and select the latest version.
+6. Restart Home Assistant.
 
 ### Manual Installation
 

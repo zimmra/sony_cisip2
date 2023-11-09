@@ -1,0 +1,31 @@
+{
+    "config": {
+      "step": {
+        "user": {
+          "title": "Connect to Sony CISIP2",
+          "description": "Please enter the IP address and port of your Sony receiver.",
+          "data": {
+            "host": "Host",
+            "port": "Port (default: 33336)",
+            "name": "Name (optional)"
+          }
+        }
+      },
+      "error": {
+        "cannot_connect": "Failed to connect, please try again.",
+        "unknown_error": "An unknown error occurred, please try again."
+      },
+      "abort": {
+        "already_configured": "This device is already configured."
+      }
+    },
+    "options": {
+      "step": {
+        "options_1": {
+          "title": "Sony CISIP2 Options",
+          "description": "Configure additional settings for your Sony receiver."
+      }
+    }
+  }
+}
+  

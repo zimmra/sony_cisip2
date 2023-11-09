@@ -1,7 +1,7 @@
 {
   "domain": "sony_cisip2",
   "name": "Sony CISIP2",
-  "documentation": "https://github.com/zimmra/python-sonycisip2",
+  "documentation": "https://github.com/zimmra/sony_cisip2",
   "requirements": ["python-sonycisip2>=0.2.4"],
   "dependencies": [],
   "codeowners": ["@Zimmra"],

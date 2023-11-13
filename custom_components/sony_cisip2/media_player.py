@@ -13,7 +13,7 @@ from homeassistant.components.media_player.const import (
     SUPPORT_VOLUME_STEP,
 )
 from homeassistant.core import HomeAssistant
-from homeassistant.util import volume as volume_util
+from homeassistant.util.unit_conversion import VolumeConverter as volume_util
 
 from .const import DOMAIN
 

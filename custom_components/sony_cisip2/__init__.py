@@ -66,9 +66,22 @@ async def try_get_mac_address(controller, max_retries=3, delay=1):
     """Attempt to get the MAC address with retries and exponential backoff."""
     for attempt in range(1, max_retries + 1):
         try:
-            mac_address = await controller.get_feature("network.macaddress")
-            if mac_address:
-                return mac_address
+            if not controller.is_connected:
+                _LOGGER.warning("Connection lost. Attempting to reconnect to get mac address...")
+                if await try_connect(controller):
+                    _LOGGER.info("Reconnected to Sony CISIP2.")
+                    mac_address = await controller.get_feature("network.macaddress")
+                    if mac_address:
+                        return mac_address
+            else:
+                mac_address = await controller.get_feature("network.macaddress")
+                if mac_address:
+                    return mac_address
+        except asyncio.CancelledError:
+            _LOGGER.error(f'Operation cancelled during attempt {attempt} to get MAC address. Retrying.')
+            if attempt < max_retries:
+                await asyncio.sleep(delay)
+                delay *= 2  # Exponential backoff
         except Exception as e:
             _LOGGER.error(f'Attempt {attempt} to get MAC address failed: {e}')
         if attempt < max_retries:
@@ -107,6 +120,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         
         if not mac_address:
             _LOGGER.error("Unable to retrieve MAC address after retries and device_tracker lookup.")
+            mac_address = None
             return True
     sony_hwversion = await controller.get_feature("system.modeltype")
     sony_swversion = await controller.get_feature("system.version")
@@ -200,17 +214,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a Sony CISIP2 config entry."""
+    # Cancel the connection monitoring task
+    if 'connection_monitor' in hass.data[DOMAIN]:
+        hass.data[DOMAIN]['connection_monitor'].cancel()
+        hass.data[DOMAIN].pop('connection_monitor')
+    # Add other data keys to remove if any
     # Remove the controller and other related data
     domain_data = hass.data[DOMAIN]
     domain_data.pop("controller", None)
     domain_data.pop("mac_address", None)
     domain_data.pop("sony_hwversion", None)
     domain_data.pop("sony_swversion", None)
-    # Cancel the connection monitoring task
-    if 'connection_monitor' in hass.data[DOMAIN]:
-        hass.data[DOMAIN]['connection_monitor'].cancel()
-        hass.data[DOMAIN].pop('connection_monitor')
-    # Add other data keys to remove if any
 
     # Forward the unload to the media_player platform
     unload_successful = await hass.config_entries.async_forward_entry_unload(entry, "media_player")

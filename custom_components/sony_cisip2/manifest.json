@@ -9,5 +9,5 @@
   "iot_class": "local_push",
   "issue_tracker": "https://github.com/zimmra/sony_cisip2/issues",
   "requirements": ["python-sonycisip2>=0.2.5"],
-  "version": "v0.4.7"
+  "version": "v0.4.8"
 }

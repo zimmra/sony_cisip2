@@ -10,6 +10,11 @@ from homeassistant.helpers.typing import ConfigType
 from .const import DOMAIN, DEFAULT_PORT
 from python_sonycisip2 import SonyCISIP2
 
+import asyncio
+import logging
+
+# Define a connection check interval (in seconds)
+CONNECTION_CHECK_INTERVAL = 60
 
 MODEL_MAP = {
     'Z11': 'STR-ZA1100ES',
@@ -25,10 +30,52 @@ CONFIG_SCHEMA = vol.Schema({
     })
 }, extra=vol.ALLOW_EXTRA)
 
+
+_LOGGER = logging.getLogger(__name__)
+
 def initialize_hass_data(hass, domain):
     """Initialize the Home Assistant data structure for Sony CISIP2 if not already initialized."""
     if domain not in hass.data:
         hass.data[domain] = {}
+
+async def try_connect(controller, max_retries=3, delay=1):
+    """Attempt to connect with retries and exponential backoff."""
+    for attempt in range(1, max_retries + 1):
+        try:
+            if await controller.connect():
+                return True
+        except Exception as e:
+            _LOGGER.error(f'Attempt {attempt} failed: {e}')
+        if attempt < max_retries:
+            await asyncio.sleep(delay)
+            delay *= 2  # Exponential backoff
+    return False
+
+async def check_connection_and_reconnect(controller, hass):
+    """Check the connection and attempt to reconnect if necessary."""
+    while True:
+        if not controller.is_connected: 
+            _LOGGER.warning("Connection lost. Attempting to reconnect...")
+            if await try_connect(controller):
+                _LOGGER.info("Reconnected to Sony CISIP2.")
+            else:
+                _LOGGER.error("Reconnection failed.")
+        await asyncio.sleep(CONNECTION_CHECK_INTERVAL)
+
+async def try_get_mac_address(controller, max_retries=3, delay=1):
+    """Attempt to get the MAC address with retries and exponential backoff."""
+    for attempt in range(1, max_retries + 1):
+        try:
+            mac_address = await controller.get_feature("network.macaddress")
+            if mac_address:
+                return mac_address
+        except Exception as e:
+            _LOGGER.error(f'Attempt {attempt} to get MAC address failed: {e}')
+        if attempt < max_retries:
+            await asyncio.sleep(delay)
+            delay *= 2  # Exponential backoff
+    return None
+
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Set up the Sony CISIP2 component from configuration.yaml."""
@@ -44,13 +91,23 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
     # Initialize the Sony CISIP2 controller
     controller = SonyCISIP2(host, port)
-    if not await controller.connect():
-        return False  # Unable to connect, do not proceed with setup
+    if not await try_connect(controller):
+        _LOGGER.error("Unable to connect to Sony CISIP2 after retries.")
+        return True  # Allow Home Assistant to continue starting
 
     # Fetch the MAC address as a unique identifier
-    mac_address = await controller.get_feature("network.macaddress")
+    mac_address = await try_get_mac_address(controller)
     if not mac_address:
-        return False  # Unable to retrieve MAC address, do not proceed with setup
+        # Try to find MAC address from device_tracker entities
+        for entity_id, state in hass.states.async_all("device_tracker"):
+            if state.attributes.get("ip") == host:
+                mac_address = state.attributes.get("mac_address")
+                if mac_address:
+                    break
+        
+        if not mac_address:
+            _LOGGER.error("Unable to retrieve MAC address after retries and device_tracker lookup.")
+            return True
     sony_hwversion = await controller.get_feature("system.modeltype")
     sony_swversion = await controller.get_feature("system.version")
     sony_hwversion = MODEL_MAP.get(sony_hwversion, 'STR-ZAxx00ES')
@@ -60,6 +117,9 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     hass.data[DOMAIN]['mac_address'] = mac_address
     hass.data[DOMAIN]['sony_hwversion'] = sony_hwversion
     hass.data[DOMAIN]['sony_swversion'] = sony_swversion
+    hass.data[DOMAIN]['connection_monitor'] = hass.loop.create_task(
+        check_connection_and_reconnect(controller, hass)
+    )
 
     # Define discovery_info with desired parameters
     discovery_info = {
@@ -80,19 +140,30 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     initialize_hass_data(hass, DOMAIN)
 
     controller = SonyCISIP2(entry.data["host"], entry.data.get("port", DEFAULT_PORT))
-    if not await controller.connect():
-        return False
+    if not await try_connect(controller):
+        _LOGGER.error("Unable to connect to Sony CISIP2 after retries.")
+        return True  # Allow Home Assistant to continue starting
 
     # Retrieve the MAC address to use as a unique identifier
-    mac_address = await controller.get_feature("network.macaddress")
+    mac_address = await try_get_mac_address(controller)
     if not mac_address:
-        return False  # Unable to retrieve MAC address, do not proceed with setup
+        # Try to find MAC address from device_tracker entities
+        for entity_id, state in hass.states.async_all("device_tracker"):
+            if state.attributes.get("ip") == host:
+                mac_address = state.attributes.get("mac_address")
+                if mac_address:
+                    break
+        
+        if not mac_address:
+            _LOGGER.error("Unable to retrieve MAC address after retries and device_tracker lookup.")
+            return True
 
     # Access the device registry directly without await
     device_registry = hass.helpers.device_registry.async_get(hass)
     # Create a unique device name by getting the MAC address
     mac_for_id = mac_address.replace(":", "").lower() if mac_address else None
     unique_name = f"Sony Receiver {mac_for_id}" if mac_for_id else f"Sony Receiver MISSINGMAC"
+    entered_name = entry.data["name"]
     sony_hwversion = await controller.get_feature("system.modeltype")
     sony_swversion = await controller.get_feature("system.version")
     sony_hwversion = MODEL_MAP.get(sony_hwversion, 'STR-ZAxx00ES')
@@ -100,7 +171,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     device = device_registry.async_get_or_create(
         config_entry_id=entry.entry_id,
         identifiers={(DOMAIN, mac_for_id)} if mac_for_id else {(DOMAIN, entry.data["host"])},  # Use MAC address as a unique identifier, with host fallback
-        name=unique_name,
+        name = entered_name if entered_name else unique_name,
         manufacturer="Sony",
         model=sony_hwversion,
         sw_version=sony_swversion,
@@ -116,6 +187,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data[DOMAIN]['mac_address'] = mac_address
     hass.data[DOMAIN]['sony_hwversion'] = sony_hwversion
     hass.data[DOMAIN]['sony_swversion'] = sony_swversion
+    hass.data[DOMAIN]['connection_monitor'] = hass.loop.create_task(
+        check_connection_and_reconnect(controller, hass)
+    )
 
 
     # Forward the setup to the media_player platform, passing the device info
@@ -126,8 +200,24 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a Sony CISIP2 config entry."""
-    # Remove the controller and MAC address
-    hass.data[DOMAIN].pop("controller", None)
-    hass.data[DOMAIN].pop("mac_address", None)
+    # Remove the controller and other related data
+    domain_data = hass.data[DOMAIN]
+    domain_data.pop("controller", None)
+    domain_data.pop("mac_address", None)
+    domain_data.pop("sony_hwversion", None)
+    domain_data.pop("sony_swversion", None)
+    # Cancel the connection monitoring task
+    if 'connection_monitor' in hass.data[DOMAIN]:
+        hass.data[DOMAIN]['connection_monitor'].cancel()
+        hass.data[DOMAIN].pop('connection_monitor')
+    # Add other data keys to remove if any
+
     # Forward the unload to the media_player platform
-    return await hass.config_entries.async_forward_entry_unload(entry, "media_player")
+    unload_successful = await hass.config_entries.async_forward_entry_unload(entry, "media_player")
+
+    # Clean up domain data if unload successful
+    if unload_successful:
+        hass.data.pop(DOMAIN, None)
+
+    return unload_successful
+

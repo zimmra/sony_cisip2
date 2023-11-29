@@ -45,28 +45,28 @@ class SonyCISIP2ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="user", data_schema=data_schema, errors=errors
         )
     
-    @callback
-    def async_get_options_flow(config_entry):
-        """Get the options flow for this handler."""
-        return SonyCISIP2OptionsFlowHandler(config_entry)
+#     @callback
+#     def async_get_options_flow(config_entry):
+#         """Get the options flow for this handler."""
+#         return SonyCISIP2OptionsFlowHandler(config_entry)
 
-class SonyCISIP2OptionsFlowHandler(config_entries.OptionsFlow):
-    async def async_step_init(self, user_input=None):
-        """Manage the options."""
-        return await self.async_step_options_1()
+# class SonyCISIP2OptionsFlowHandler(config_entries.OptionsFlow):
+#     async def async_step_init(self, user_input=None):
+#         """Manage the options."""
+#         return await self.async_step_options_1()
 
-    async def async_step_options_1(self, user_input=None):
-        """Manage the Sony CISIP2 options."""
-        if user_input is not None:
-            # Update options
-            return self.async_create_entry(title="", data=user_input)
+#     async def async_step_options_1(self, user_input=None):
+#         """Manage the Sony CISIP2 options."""
+#         if user_input is not None:
+#             # Update options
+#             return self.async_create_entry(title="", data=user_input)
 
-        # Define the options schema here if needed
-        options_schema = vol.Schema({
-            # Define your options fields here
-        })
+#         # Define the options schema here if needed
+#         options_schema = vol.Schema({
+#             # Define your options fields here
+#         })
 
-        return self.async_show_form(
-            step_id="options_1",
-            data_schema=options_schema
-        )
+#         return self.async_show_form(
+#             step_id="options_1",
+#             data_schema=options_schema
+#         )

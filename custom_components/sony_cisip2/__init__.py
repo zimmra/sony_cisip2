@@ -163,7 +163,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if not mac_address:
         # Try to find MAC address from device_tracker entities
         for entity_id, state in hass.states.async_all("device_tracker"):
-            if state.attributes.get("ip") == host:
+            if state.attributes.get("ip") == entry.data["host"]:
                 mac_address = state.attributes.get("mac_address")
                 if mac_address:
                     break

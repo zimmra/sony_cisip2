@@ -177,7 +177,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Create a unique device name by getting the MAC address
     mac_for_id = mac_address.replace(":", "").lower() if mac_address else None
     unique_name = f"Sony Receiver {mac_for_id}" if mac_for_id else f"Sony Receiver MISSINGMAC"
-    entered_name = entry.data["name"]
+    entered_name = entry.data.get("name", "Sony ES AVR")
     sony_hwversion = await controller.get_feature("system.modeltype")
     sony_swversion = await controller.get_feature("system.version")
     sony_hwversion = MODEL_MAP.get(sony_hwversion, 'STR-ZAxx00ES')
